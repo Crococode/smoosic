@@ -1,8 +1,16 @@
 #!/usr/bin/env python
-import yaafelib as yaafe
 import sys
 import os
 import pb_functions
+from ctypes import cdll
+
+try:
+    import yaafelib as yaafe
+except ImportError, e:
+    print 'ERROR: cannot load yaafe packages: ', e
+    sys.exit()
+
+print yaafe.__file__
 
 def afeImport( musiclist, featureplan):
 	fin = open(musiclist,'r')
@@ -25,8 +33,8 @@ def afeImport( musiclist, featureplan):
 			
 
 def afe( audiofiles , featureplan):
-	if yaafe.loadComponentLibrary('yaafe-io')!=0:
-			print 'WARNING: cannot load yaafe-io component library !'
+        if yaafe.loadComponentLibrary('yaafe-io')!=0:
+        		print 'WARNING: cannot load yaafe-io component library !'
 	globalrate = 44100
 	fp = yaafe.FeaturePlan(sample_rate=globalrate)
 	# read featureplan list
@@ -46,8 +54,10 @@ def afe( audiofiles , featureplan):
 					print 'ERROR: invalid parameter syntax in "%s" (should be "key=value")'%pstr
 					return
 				oparams[pstrdata[0]] = pstrdata[1]
-			afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(__file__)),oparams)
-			# process audio files
+                        #afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(__file__)),oparams)
+                        afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(__file__)),oparams)
+
+                        # process audio files
 			for audiofile in audiofiles:
 				afp.processFile(engine,audiofile)
 
@@ -56,4 +66,9 @@ def afe( audiofiles , featureplan):
     
 
 if __name__ == '__main__':
-    afe(sys.argv[1],sys.argv[2])
+    fin = open(sys.argv[1],'r')
+    songs = []
+    for line in fin:
+        songs.append(line.strip('\n'))
+    fin.close
+    afe(songs,sys.argv[2])

@@ -26,3 +26,9 @@
 *.exe
 *.out
 *.app
+
+# local Playlists and analysis files
+
+*.nml
+*.m3u
+*.csv
