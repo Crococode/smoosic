@@ -1,8 +1,8 @@
 import sys
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-import scipy as sp
+#import matplotlib.pyplot as plt
+#import scipy as sp
 import linecache as lc
 
 def getFeatures( featureplan ):
@@ -76,8 +76,8 @@ def timbFV( audiofile, features , segst, seglen ):
 	mat = mat.reshape((nof,seglen))
 	tfv = []
 	for j in range(nof):
-		tfv.append(sp.mean(mat[j,:]))
-		tfv.append(sp.var(mat[j,:]))
+		tfv.append(np.mean(mat[j,:]))
+		tfv.append(np.var(mat[j,:]))
 	# compute low energy feature:
 	lef = 0
 	for j in range(seglen):
@@ -248,8 +248,8 @@ def findSeg( audiofile , featureplan , num):
 	for i in range(nof):
 		for j in range(newlen):
 			start = j*windowsize
-			tfv.append(sp.mean(mat[i,range(start, start+windowsize)]))
-			#tfv.append(sp.var(mat[i,range(start, start+windowsize)]))
+			tfv.append(np.mean(mat[i,range(start, start+windowsize)]))
+			#tfv.append(np.var(mat[i,range(start, start+windowsize)]))
 	mat = np.array(tfv)
 	mat = mat.reshape((nof,newlen))
 	nof = nof
