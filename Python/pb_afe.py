@@ -12,20 +12,13 @@ except ImportError, e:
 
 print yaafe.__file__
 
-def afeImport( musiclist, featureplan):
-	fin = open(musiclist,'r')
-	audiofiles = []
+def afeImport( audiofiles , featureplan):
 	newfiles = set()
-	for line in fin:
-		audiofiles.append(line.strip())
-	fin.close()
 	features = pb_functions.getFeatures(featureplan)
 	for audiofile in audiofiles:
 		for feat in features:
-			try:
-				fin = open(os.path.dirname(os.path.realpath(__file__)) + audiofile + "." + str(feat) + ".csv")
-			except IOError:
-				newfiles.add(audiofile)
+			if not os.path.isfile(os.path.dirname(os.path.realpath(sys.argv[0])) + pb_functions.fileHandler(audiofile) + "." + str(feat) + ".csv"):
+                                newfiles.add(audiofile)
 	if len(newfiles) == 0:
 		print "No extraction necessary. Database is up to date."
 	else:
@@ -55,7 +48,7 @@ def afe( audiofiles , featureplan):
 					return
 				oparams[pstrdata[0]] = pstrdata[1]
                         #afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(__file__)),oparams)
-                        afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(__file__)),oparams)
+                        afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(sys.argv[0])),oparams)
 
                         # process audio files
 			for audiofile in audiofiles:

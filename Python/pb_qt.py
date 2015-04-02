@@ -1,22 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-"""
-ZetCode PyQt4 tutorial 
-
-This program creates a quit
-button. When we press the button,
-the application terminates. 
-
-author: Jan Bodnar
-website: zetcode.com 
-last edited: October 2011
-"""
-
 import sys
 import os
 import pb_functions as pb
 import pb_nml as nml
+import pb_afe as afe
 from PyQt4 import QtGui, QtCore
 
 class playlistTable(QtGui.QWidget):
@@ -30,16 +19,19 @@ class playlistTable(QtGui.QWidget):
         self.setLayout(grid)
     
 
-class Example(QtGui.QMainWindow):
+class Gui(QtGui.QMainWindow):
     
     fname = ''
     songs = []
-    featureplan = os.path.dirname(os.path.realpath(__file__))+'/featureplan.txt'
+    featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan.txt')
     start = str(0)
+    timelineMode = True
+    bpmVal = 0.5
+    keyVal = 0.5
     
     
     def __init__(self):
-        super(Example, self).__init__()
+        super(Gui, self).__init__()
         grid = QtGui.QGridLayout()
         self.pbTab = playlistTable()
         self.list = nml.Playlist([],[])
@@ -51,15 +43,28 @@ class Example(QtGui.QMainWindow):
         self.setCentralWidget(wid)
         grid = QtGui.QGridLayout()
         wid.setLayout(grid)
+        
+        timelineEdit = QtGui.QRadioButton(self)
+        timelineEdit.setChecked(self.timelineMode)
+        grid.addWidget(QtGui.QLabel('Timeline mode: '), 0, 0, QtCore.Qt.AlignLeft)
+        grid.addWidget(timelineEdit, 0, 1, QtCore.Qt.AlignLeft)
         startEdit = QtGui.QLineEdit(self.start)
-        grid.addWidget(startEdit, 0, 0, QtCore.Qt.AlignLeft);
-        grid.addWidget(self.pbTab, 1, 0,  QtCore.Qt.AlignLeft)
-        self.setWindowIcon(QtGui.QIcon('web.png')) 
-        qbtn = QtGui.QPushButton('Quit', self)
-        qbtn.setToolTip('This is a <b>QPushButton</b> widget')
-        #qbtn.clicked.connect(self.closeDialog())
-        grid.addWidget(qbtn, 2, 0,  QtCore.Qt.AlignLeft)
-        self.setToolTip('This is a <b>QWidget</b> widget')
+        grid.addWidget(QtGui.QLabel('First Track: '), 1, 0, QtCore.Qt.AlignLeft)
+        grid.addWidget(startEdit, 1, 1, QtCore.Qt.AlignLeft)
+        bpmEdit = QtGui.QSlider(QtCore.Qt.Horizontal,self)
+        bpmEdit.setRange(0,1)
+        bpmEdit.setValue(self.bpmVal)
+        #bpmEdit.valueChanged.connect(self.bpmVal)
+        grid.addWidget(QtGui.QLabel('BPM sensitivity: '), 0, 2, QtCore.Qt.AlignLeft)
+        grid.addWidget(bpmEdit,0, 3, QtCore.Qt.AlignLeft)
+        keyEdit = QtGui.QSlider(QtCore.Qt.Horizontal,self)
+        keyEdit.setRange(0,1)
+        keyEdit.setValue(self.keyVal)
+        #keyEdit.valueChanged.connect(self.keyVal)
+        grid.addWidget(QtGui.QLabel('Key sensitivity: '), 1, 2, QtCore.Qt.AlignLeft)
+        grid.addWidget(keyEdit, 1, 3, QtCore.Qt.AlignLeft)        
+        grid.addWidget(self.pbTab, 3, 0, 1 , 4)
+        
         self.statusBar().showMessage('Ready')
         exitAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&Exit', self)        
         exitAction.setShortcut('Ctrl+Q')
@@ -86,17 +91,22 @@ class Example(QtGui.QMainWindow):
         fileMenu.addAction(openFeatAction)
         toolMenu.addAction(distanceMatrixSmartAction)
         
-        
-        
-        self.setGeometry(300, 300, 250, 150)
-        self.setWindowTitle('Quit button')    
+        self.setGeometry(200, 200, 400, 300)
+        self.setWindowTitle('Smoosic 1.0')    
         self.show()
         
     def exeDistanceMatrixMtlSmart(self):
         output = QtGui.QFileDialog.getSaveFileName(self, 'Output file', 
-                os.path.dirname(os.path.realpath(__file__)))
+                os.path.dirname(os.path.realpath(sys.argv[0])))
+        self.statusBar().showMessage('Importing music to AFE Database')
+        afe.afeImport(self.songs, self.featureplan)
+        self.statusBar().showMessage('Updating timelines')
+        pb.updateMtlDatabase(self.songs, self.featureplan,4)
+        self.statusBar().showMessage('Starting distance matrix calculation')
         mat,sections, sentrys, eentrys = pb.distanceMatrixMtlSmart(self.songs, self.featureplan)
+        self.statusBar().showMessage('Sorting distance matrix')
         pb.orderMatrixSmart(self.songs,mat,sections, sentrys, eentrys, int(self.start), output)
+        self.statusBar().showMessage('Ready')
 
     
     def closeDialog(self, event):
@@ -109,7 +119,8 @@ class Example(QtGui.QMainWindow):
     def showOpenDialog(self):
         
         self.fname = QtGui.QFileDialog.getOpenFileName(self, 'Load playlist file', 
-                os.path.dirname(os.path.realpath(__file__)))
+                os.path.dirname(os.path.realpath(sys.argv[0])))
+        self.statusBar().showMessage('Opening: '+self.fname)
         if QtCore.QFileInfo(self.fname).suffix() == "nml":
             print "Loading NML File: ",  self.fname
             songs,  order = nml.NMLHandler().loadFile(self.fname)
@@ -118,6 +129,7 @@ class Example(QtGui.QMainWindow):
             for i in songs:
                 txtlist.append(i.location)
             self.pbTab.addList(txtlist)
+            self.statusBar().showMessage('Ready')
             return
         fin = open(self.fname)
         print "Loading TXT File: ",  self.fname
@@ -126,18 +138,23 @@ class Example(QtGui.QMainWindow):
         fin.close
         #self.centralWidget().layout().itemAtPosition(1, 0).widget().addList(self.songs)
         self.list.add(self.songs, '')
+        self.pbTab.addList(self.songs)
+        self.statusBar().showMessage('Ready')
         
     
     def showOpenFeatDialog(self):
 
         self.featureplan = QtGui.QFileDialog.getOpenFileName(self, 'Load featureplan file', 
-                os.path.dirname(os.path.realpath(__file__)))
+                os.path.dirname(os.path.realpath(sys.argv[0])))
+
+
+        
         
 
 def main():
     
     app = QtGui.QApplication(sys.argv)
-    ex = Example()
+    gui = Gui()
     sys.exit(app.exec_())
 
 

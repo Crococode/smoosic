@@ -29,6 +29,7 @@
 
 # local Playlists and analysis files
 
+*.mtl
 *.nml
 *.m3u
 *.csv
