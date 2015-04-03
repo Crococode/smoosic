@@ -8,11 +8,11 @@ from pb_nml import Song, fileHandler
 #import scipy as sp
 
 DEFAULT_ANALYSIS_LENGTH = 1000
-DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+"/database"
-#if sys.platform.startswith("win32"):
-#        DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("\\database")
-#else:
-#        DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("/database")
+#DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+"/database"
+if sys.platform.startswith("win32"):
+        DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("\\database")
+else:
+        DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("/database")
                 
 
 def getFeatures( featureplan ):
@@ -84,12 +84,12 @@ def fillFVs( audiofile , features):
 
 def timbFV( audiofile, features , segst, seglen ):
 	fv, nof = fillFVsBySeg( audiofile, features , segst, seglen )
-	mat = numpy.array(fv)
+	mat = array(fv)
 	mat = mat.reshape((nof,seglen))
 	tfv = []
 	for j in range(nof):
-		tfv.append(numpy.mean(mat[j,:]))
-		tfv.append(numpy.var(mat[j,:]))
+		tfv.append(mean(mat[j,:]))
+		tfv.append(var(mat[j,:]))
 	# compute low energy feature:
 	lef = 0
 	for j in range(seglen):
@@ -97,10 +97,10 @@ def timbFV( audiofile, features , segst, seglen ):
 			lef = lef+1
 	# norm timbFV:
 	tfv[0]=float(lef)/seglen
-	tfv[2]=1+numpy.log10(tfv[2])/numpy.log10(16000)
-	tfv[3]=1+numpy.log10(tfv[3])/numpy.log10(16000)
-	tfv[4]=numpy.log10(tfv[4])/numpy.log10(16000)
-	tfv[5]=numpy.log10(tfv[5])/numpy.log10(16000)
+	tfv[2]=1+log10(tfv[2])/log10(16000)
+	tfv[3]=1+log10(tfv[3])/log10(16000)
+	tfv[4]=log10(tfv[4])/log10(16000)
+	tfv[5]=log10(tfv[5])/log10(16000)
 	tfv[6]=tfv[6]/seglen
 	#print tfv
 	return tfv
@@ -118,7 +118,7 @@ def comp2FV( fv1, fv2 ):
 			ffv.append(m/n)
 		else:
 			ffv.append(0)
-	return numpy.linalg.norm(numpy.array(ffv))
+	return linalg.norm(array(ffv))
 
 # DEPRECATED!
 # testing function
@@ -132,7 +132,7 @@ def comp2Songs( song1, song2 , featureplan):
 		fvs1.append(timbFV( song1.location, featureplan , i, seglen ))
 	for i in maxi2:
 		fvs2.append(timbFV( song2.location, featureplan , i, seglen ))
-	mat = numpy.ones((len(maxi1),len(maxi2)))
+	mat = ones((len(maxi1),len(maxi2)))
 	for i in range(len(maxi1)):
 		for j in range(len(maxi2)):
 			mat[i,j]=comp2FV(fvs1[i],fvs2[j])
@@ -179,7 +179,7 @@ def updateSeg( audiofiles , featureplan, num ):
 def findSeg( audiofile , featureplan , num):
 	features = getFeatures( featureplan )
 	fv, nos, nof = fillFVs( audiofile, features )
-	mat = numpy.array(fv)
+	mat = array(fv)
 	mat = mat.reshape((nof,nos))
 	
 	# average data over desired windowsize:
@@ -190,9 +190,9 @@ def findSeg( audiofile , featureplan , num):
 	for i in range(nof):
 		for j in range(newlen):
 			start = j*windowsize
-			tfv.append(numpy.mean(mat[i,range(start, start+windowsize)]))
+			tfv.append(mean(mat[i,range(start, start+windowsize)]))
 			#tfv.append(np.var(mat[i,range(start, start+windowsize)]))
-	mat = numpy.array(tfv)
+	mat = array(tfv)
 	mat = mat.reshape((nof,newlen))
 	nof = nof
 	NumberOfSamples = nos
@@ -200,26 +200,26 @@ def findSeg( audiofile , featureplan , num):
 	
 	
 	# create covariance matrix
-	cm = numpy.zeros((nof,nof))
+	cm = zeros((nof,nof))
 	for i in range(nof):
 		a = mat[i,:]
 		for j in range(nof):
 			if not i==j:
 				b = mat[j,:]
-				elem = numpy.cov(a,b)
+				elem = cov(a,b)
 				cm[i,i] = elem[0,0]
 				cm[j,j] = elem[1,1]
 				cm[i,j] = elem[0,1]
 				cm[j,i] = elem[1,0]
 	# inverted covariance matrix
-	icm = numpy.linalg.inv(cm)
+	icm = linalg.inv(cm)
 	# distance vector
-	dv = numpy.zeros(nos)
-	ddv = numpy.zeros(nos)
+	dv = zeros(nos)
+	ddv = zeros(nos)
 	
 		
 	for i in range(int(0.05*nos),int(0.95*nos)):
-		dif = numpy.array(mat.T[i]-mat.T[i+1])
+		dif = array(mat.T[i]-mat.T[i+1])
 		dv[i] = dif.T.dot(icm).dot(dif)
 		ddv[i] = dv[i]-dv[i-1]
 	#plt.plot(dv)
@@ -231,7 +231,7 @@ def findSeg( audiofile , featureplan , num):
 	maxi = []
 	deletedRange = int(nos/(num*2))
 	for i in range(num):
-		maxi.append(numpy.argmax(ddv))
+		maxi.append(argmax(ddv))
 		for j in range(deletedRange):
 			try:
 				ddv[maxi[i]-j]=0
@@ -285,7 +285,7 @@ def distanceMatrixMtlSmart(songs, featureplan, bpmVal, keyVal):
 			label = fin.readline()
 			efvs.append(timbFV( s.location, features , sta, end-sta ).append(s.bpm).append(s.key))
 			eentrys.append(s+":"+label+".:"+str(sta))
-    mat = numpy.zeros((matlen,matlen))
+    mat = zeros((matlen,matlen))
     for i in range(matlen):
 		for j in range(matlen):
 			mat[i,j]=comp2FV(efvs[i],sfvs[j])
@@ -310,7 +310,7 @@ def distanceMatrixMtl(songs, featureplan):
 			label = fin.readline()
 			fvs.append(timbFV( s.location, features , sta, end-sta ))
 			entrys.append(s+"."+label+"."+str(secs))
-	mat = numpy.zeros((len(entrys),len(entrys)))
+	mat = zeros((len(entrys),len(entrys)))
 	for i in range(len(entrys)):
 		for j in range(len(entrys)):
 			if j>i:
@@ -330,7 +330,7 @@ def distanceMatrix( songs , featureplan, bpmVal, keyVal):
 	for song in songs:
 		sta = int(segs[song])
 		fvs.append(timbFV( song.location, features , sta, seglen ))
-	mat = numpy.zeros((len(fvs),len(fvs)))
+	mat = zeros((len(fvs),len(fvs)))
 	for i in range(len(fvs)):
 		for j in range(len(fvs)):
 			if j>i:
@@ -345,7 +345,7 @@ def orderMatrix( mat, entrys, first ):
 	final[0] = first
 	mat[:,first]=float("inf")
 	for i in range(len(mat[0])-1):
-		final[i+1] = numpy.argmin(mat[final[i]])
+		final[i+1] = argmin(mat[final[i]])
 		mat[:,final[i+1]]=float("inf")
 	for i in final:
 		print i,":",entrys[i]
@@ -364,7 +364,7 @@ def orderMatrixSmart( songs, mat, sections, sentrys, eentrys, first,  outputfile
         testlist = []
         for j in range(sections[final[i]],sections[final[i]+1]):
             testlist.append(mat[:,i])
-        argmin = numpy.argmin(testlist)
+        argmin = argmin(testlist)
         while argmin > sections[len(sections)-1]:
             argmin = argmin - sections[len(sections)-1]
             esection[i] = esection[i]+1

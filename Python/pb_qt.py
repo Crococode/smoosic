@@ -132,7 +132,7 @@ class Gui(QtGui.QMainWindow):
         afe.afeImport(self.list.songs, self.featureplan)
         self.statusBar().showMessage('Updating timelines')
         pb.updateMtlDatabase(self.list.songs, self.featureplan,4)
-        if self.bpm.Label.isEnabled() == True:
+        if self.bpmLabel.isEnabled() == True:
             self.statusBar().showMessage('Starting distance matrix calculation')
             mat,sections, sentrys, eentrys = pb.distanceMatrixMtlSmart(self.list.songs, self.featureplan)
             self.statusBar().showMessage('Sorting distance matrix')

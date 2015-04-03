@@ -1,11 +1,11 @@
 from lxml import etree as et
-from platform from sys import startswith
+from sys import platform
 
 DEFAULT_LEN = 4000
 
 def fileHandler(filen):
                 
-        if sys.platform.startswith("win32"):
+        if platform.startswith("win32"):
                 if filen == '':
                         return '\\'
                 elif filen[0] == '\\':
@@ -41,6 +41,9 @@ class Song(object):
     title = ''
     key = 0
     sections = []
+    startsections = []
+    endsections =[]
+    playtime = 0
     
     def __init__(self, artist, title, bpm, key, location, sections):
         self.bpm = bpm
@@ -51,6 +54,25 @@ class Song(object):
         self.key = key
         for sec in sections:
             self.sections.append(sec)
+
+    def Song(self, artist, title, bpm, key, location, sections, playtime):
+        self.bpm = bpm
+        self.artist = artist
+        self.title = title
+        self.location = location
+        self.sections = sections
+        self.key = key
+        if playtime != 0.0:
+                self.playtime = playtime
+                middle = 0.5*playtime
+                for sec in sections:
+                        if sec.start < middle:
+                                self.startsections.append(sec)
+                        else:
+                                self.endsections.append(sec)
+        else:
+                self.sections.append(sec)
+        
 
     
     #def Song(artist, track,  bpm, key, location, sections):
@@ -88,6 +110,7 @@ class Playlist(object):
         for s in self.songs:
             tab.append([s.location,s.bpm,s.key])
         return tab
+
     
     def sendArtistTitleTable(self):
         tab = []
@@ -122,10 +145,12 @@ class NMLHandler(object):
                             bpm = child.get("BPM")
                         if child.tag=='MUSICAL_KEY':
                             key = child.get("VALUE")
+                        if child.tag=='INFO':
+                                playtime = child.get("PLAYTIME")
                         if child.tag=='CUE_V2':
                             if child.get("TYPE")==5:
                                 sections.append(Section(child.get("START"),child.get("LEN")))
-                    songs.append(Song(artist,title,bpm, key, location, sections))
+                    songs.append(Song(artist,title,bpm, key, location, sections,playtime))
             if i.tag =='PLAYLISTS':
                 if i[0][0].tag=='SUBNODES':
                     for j in range(int(i[0][0].get("COUNT"))):

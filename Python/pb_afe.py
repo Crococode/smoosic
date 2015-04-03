@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys
 import os
-import pb_functions
+from pb_functions import DEFAULT_DATABASE,fileHandler, getFeatures
 from ctypes import cdll
 
 try:
@@ -12,13 +12,13 @@ except ImportError, e:
 
 print yaafe.__file__
 
-def afeImport( audiofiles , featureplan):
+def afeImport( songs , featureplan):
 	newfiles = set()
-	features = pb_functions.getFeatures(featureplan)
-	for audiofile in audiofiles:
+	features = getFeatures(featureplan)
+	for song in songs:
 		for feat in features:
-			if not os.path.isfile(os.path.dirname(os.path.realpath(sys.argv[0])) + pb_functions.fileHandler(audiofile) + "." + str(feat) + ".csv"):
-                                newfiles.add(audiofile)
+			if not os.path.isfile(DEFAULT_DATABASE + fileHandler(song.location) + "." + str(feat) + ".csv"):
+                                newfiles.add(song.location)
 	if len(newfiles) == 0:
 		print "No extraction necessary. Database is up to date."
 	else:
@@ -47,8 +47,8 @@ def afe( audiofiles , featureplan):
 					print 'ERROR: invalid parameter syntax in "%s" (should be "key=value")'%pstr
 					return
 				oparams[pstrdata[0]] = pstrdata[1]
-                        #afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(__file__)),oparams)
-                        afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(sys.argv[0])),oparams)
+                        afp.setOutputFormat('csv',os.path.dirname(os.path.realpath(__file__))+"/database",oparams)
+                        #afp.setOutputFormat('csv',DEFAULT_DATABASE,oparams)
 
                         # process audio files
 			for audiofile in audiofiles:
