@@ -9,25 +9,52 @@ import pb_afe as afe
 from PyQt4 import QtGui, QtCore
 
 class playlistTable(QtGui.QWidget):
+    lay = QtGui.QVBoxLayout()
     def __init__(self):
         super(playlistTable, self).__init__()
+        self.setLayout(self.lay)
     
-    def addList(self, list):
-        grid = QtGui.QGridLayout()
-        for i, song in enumerate(list):
-            grid.addWidget(QtGui.QLabel(song))
-        self.setLayout(grid)
+    def addList(self, list, name):
+        try:
+            currentTable = self.lay.takeAt(0).widget()
+            currentTable.deleteLater()
+        except AttributeError:
+            pass
+        table_model = playlistTableModel(self, list, name)
+        table_view = QtGui.QTableView()
+        table_view.setModel(table_model)
+        table_view.resizeColumnsToContents()
+        self.lay.addWidget(table_view)
+
+class playlistTableModel(QtCore.QAbstractTableModel):
+    def __init__(self, parent, mylist, header, *args):
+        QtCore.QAbstractTableModel.__init__(self, parent, *args)
+        self.mylist = mylist
+        self.header = header
+    def rowCount(self, parent):
+        return len(self.mylist)
+    def columnCount(self, parent):
+        return len(self.mylist[0])
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        elif role != QtCore.Qt.DisplayRole:
+            return None
+        return self.mylist[index.row()][index.column()]
+    def headerData(self, col, orientation, role):
+        if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
+            return self.header[col]
+        return None
     
 
 class Gui(QtGui.QMainWindow):
     
     fname = ''
-    songs = []
     featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan.txt')
     start = str(0)
     timelineMode = True
-    bpmVal = 0.5
-    keyVal = 0.5
+    bpmVal = 50
+    keyVal = 50
     
     
     def __init__(self):
@@ -35,6 +62,16 @@ class Gui(QtGui.QMainWindow):
         grid = QtGui.QGridLayout()
         self.pbTab = playlistTable()
         self.list = nml.Playlist([],[])
+        self.keyEdit = QtGui.QSlider(QtCore.Qt.Horizontal,self)
+        self.keyEdit.setRange(0,99)
+        self.keyEdit.setValue(self.keyVal)
+        self.keyEdit.setStatusTip('Change key sensitivity for playlist optimization')
+        self.keyLabel = QtGui.QLabel('Key sensitivity: ')
+        self.bpmEdit = QtGui.QSlider(QtCore.Qt.Horizontal,self)
+        self.bpmEdit.setRange(0,99)
+        self.bpmEdit.setValue(self.bpmVal)
+        self.bpmEdit.setStatusTip('Change BPM sensitivity for playlist optimization')
+        self.bpmLabel = QtGui.QLabel('BPM sensitivity: ')
         self.initUI()
         
     def initUI(self):               
@@ -46,23 +83,17 @@ class Gui(QtGui.QMainWindow):
         
         timelineEdit = QtGui.QRadioButton(self)
         timelineEdit.setChecked(self.timelineMode)
+        timelineEdit.setStatusTip('Switch between timeline and single vector mode')
         grid.addWidget(QtGui.QLabel('Timeline mode: '), 0, 0, QtCore.Qt.AlignLeft)
         grid.addWidget(timelineEdit, 0, 1, QtCore.Qt.AlignLeft)
         startEdit = QtGui.QLineEdit(self.start)
+        startEdit.setStatusTip('Choose first track for optimized playlist')
         grid.addWidget(QtGui.QLabel('First Track: '), 1, 0, QtCore.Qt.AlignLeft)
         grid.addWidget(startEdit, 1, 1, QtCore.Qt.AlignLeft)
-        bpmEdit = QtGui.QSlider(QtCore.Qt.Horizontal,self)
-        bpmEdit.setRange(0,1)
-        bpmEdit.setValue(self.bpmVal)
-        #bpmEdit.valueChanged.connect(self.bpmVal)
-        grid.addWidget(QtGui.QLabel('BPM sensitivity: '), 0, 2, QtCore.Qt.AlignLeft)
-        grid.addWidget(bpmEdit,0, 3, QtCore.Qt.AlignLeft)
-        keyEdit = QtGui.QSlider(QtCore.Qt.Horizontal,self)
-        keyEdit.setRange(0,1)
-        keyEdit.setValue(self.keyVal)
-        #keyEdit.valueChanged.connect(self.keyVal)
-        grid.addWidget(QtGui.QLabel('Key sensitivity: '), 1, 2, QtCore.Qt.AlignLeft)
-        grid.addWidget(keyEdit, 1, 3, QtCore.Qt.AlignLeft)        
+        grid.addWidget(self.bpmLabel, 0, 2, QtCore.Qt.AlignLeft)
+        grid.addWidget(self.bpmEdit,0, 3, QtCore.Qt.AlignLeft)        
+        grid.addWidget(self.keyLabel, 1, 2, QtCore.Qt.AlignLeft)
+        grid.addWidget(self.keyEdit, 1, 3, QtCore.Qt.AlignLeft)        
         grid.addWidget(self.pbTab, 3, 0, 1 , 4)
         
         self.statusBar().showMessage('Ready')
@@ -70,7 +101,6 @@ class Gui(QtGui.QMainWindow):
         exitAction.setShortcut('Ctrl+Q')
         exitAction.setStatusTip('Exit application')
         self.connect(exitAction, QtCore.SIGNAL("clicked()"), self.closeDialog)
-        #exitAction.triggered.connect(self.closeDialog(QtGui.qApp.quit))
         openAction = QtGui.QAction( QtGui.QIcon('exit.png'),  '&Load playlist', self)    
         openAction.setShortcut('Ctrl+L')
         openAction.setStatusTip('Load Playlist file')
@@ -99,14 +129,21 @@ class Gui(QtGui.QMainWindow):
         output = QtGui.QFileDialog.getSaveFileName(self, 'Output file', 
                 os.path.dirname(os.path.realpath(sys.argv[0])))
         self.statusBar().showMessage('Importing music to AFE Database')
-        afe.afeImport(self.songs, self.featureplan)
+        afe.afeImport(self.list.songs, self.featureplan)
         self.statusBar().showMessage('Updating timelines')
-        pb.updateMtlDatabase(self.songs, self.featureplan,4)
-        self.statusBar().showMessage('Starting distance matrix calculation')
-        mat,sections, sentrys, eentrys = pb.distanceMatrixMtlSmart(self.songs, self.featureplan)
-        self.statusBar().showMessage('Sorting distance matrix')
-        pb.orderMatrixSmart(self.songs,mat,sections, sentrys, eentrys, int(self.start), output)
-        self.statusBar().showMessage('Ready')
+        pb.updateMtlDatabase(self.list.songs, self.featureplan,4)
+        if self.bpm.Label.isEnabled() == True:
+            self.statusBar().showMessage('Starting distance matrix calculation')
+            mat,sections, sentrys, eentrys = pb.distanceMatrixMtlSmart(self.list.songs, self.featureplan)
+            self.statusBar().showMessage('Sorting distance matrix')
+            pb.orderMatrixSmart(self.list.songs,mat,sections, sentrys, eentrys, int(self.start), output)
+            self.statusBar().showMessage('Ready')
+        else:
+            self.statusBar().showMessage('Starting distance matrix calculation')
+            mat,sections, sentrys, eentrys = pb.distanceMatrixMtlSmart(self.list.songs, self.featureplan)
+            self.statusBar().showMessage('Sorting distance matrix')
+            pb.orderMatrixSmart(self.list.songs,mat,sections, sentrys, eentrys, int(self.start), output)
+            self.statusBar().showMessage('Ready')
 
     
     def closeDialog(self, event):
@@ -128,18 +165,28 @@ class Gui(QtGui.QMainWindow):
             txtlist = []
             for i in songs:
                 txtlist.append(i.location)
-            self.pbTab.addList(txtlist)
+            self.pbTab.addList(self.list.sendTable(), ['File','BPM', 'Key'])
             self.statusBar().showMessage('Ready')
+            self.bpmLabel.setEnabled(True)
+            self.keyLabel.setEnabled(True)
+            self.bpmEdit.setEnabled(True)
+            self.keyEdit.setEnabled(True)
             return
         fin = open(self.fname)
         print "Loading TXT File: ",  self.fname
+        songs = []
         for line in fin:
-            self.songs.append(line.strip())
-        fin.close
-        #self.centralWidget().layout().itemAtPosition(1, 0).widget().addList(self.songs)
-        self.list.add(self.songs, '')
-        self.pbTab.addList(self.songs)
+            songs.append(nml.Song(' ',' ',0,0,line.strip(),[]))
+        fin.close()
+        self.list.add(songs,[])
+        self.pbTab.addList(self.list.sendArtistTitleTable(), ['File','Artist', 'Title'])
+        self.bpmLabel.setEnabled(False)
+        self.keyLabel.setEnabled(False)
+        self.bpmEdit.setEnabled(False)
+        self.keyEdit.setEnabled(False)
         self.statusBar().showMessage('Ready')
+        
+        
         
     
     def showOpenFeatDialog(self):

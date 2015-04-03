@@ -52,6 +52,7 @@ def afe( audiofiles , featureplan):
 
                         # process audio files
 			for audiofile in audiofiles:
+                                print "Processing: ", audiofile
 				afp.processFile(engine,audiofile)
 
 
