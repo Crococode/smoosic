@@ -2,6 +2,8 @@ from lxml import etree as et
 from sys import platform
 
 DEFAULT_LEN = 4000
+TO_FRAMES = 44.1/512
+FROM_FRAMES = 512/44.1
 
 def fileHandler(filen):
                 
@@ -24,44 +26,55 @@ def fileHandler(filen):
 
 # units are given in mseconds
 class Section(object):
+    
 
-    def __init__(self, start, length):
+    def __init__(self, start, length, label):
         self.start = start
-        if length != 0:
+        if length >= 0:
             self.length = length
             self.end = start + length
         else:
             self.length = DEFAULT_LEN
-            self.end = DEFAULT_LEN
+            self.end = start + DEFAULT_LEN
+        self.label = label
+        
+    def toFrames(self):
+            return int(self.start * TO_FRAMES), int(self.length * TO_FRAMES)
 
+    def fromFrames(self):
+        self.start *= FROM_FRAMES
+        self.length *= FROM_FRAMES
+        #return self
+
+        
 class Song(object):
-    bpm = 0
-    location = ''
-    artist = ''
-    title = ''
-    key = 0
-    sections = []
-    startsections = []
-    endsections =[]
-    playtime = 0
+    #bpm = 0
+    #location = ''
+    #artist = ''
+    #title = ''
+    #key = 0
+    #sections = []
+    #startsections = []
+    #endsections =[]
+    #playtime = 0.0
     
-    def __init__(self, artist, title, bpm, key, location, sections):
-        self.bpm = bpm
-        self.artist = artist
-        self.title = title
-        self.location = location
-        self.sections = sections
-        self.key = key
-        for sec in sections:
-            self.sections.append(sec)
+    #def __init__(self, artist, title, bpm, key, location, sections):
+    #    self.bpm = bpm
+    #    self.artist = artist
+    #    self.title = title
+    #    self.location = location
+    #    self.key = key
+    #    for sec in sections:
+    #        self.sections.append(sec)
 
-    def Song(self, artist, title, bpm, key, location, sections, playtime):
+    def __init__(self, artist, title, bpm, key, location, sections, playtime):
         self.bpm = bpm
         self.artist = artist
         self.title = title
         self.location = location
-        self.sections = sections
         self.key = key
+        self.startsections = []
+        self.endsections =[]
         if playtime != 0.0:
                 self.playtime = playtime
                 middle = 0.5*playtime
@@ -71,7 +84,14 @@ class Song(object):
                         else:
                                 self.endsections.append(sec)
         else:
-                self.sections.append(sec)
+                for sec in sections:
+                        self.sections.append(sec)
+                        
+    def addSectionList(self, startsecs,endsecs):
+        for ssec in startsecs:
+                self.startsections.append(ssec)
+        for ssec in endsecs:
+                self.endsections.append(ssec)
         
 
     
@@ -85,10 +105,12 @@ class Song(object):
 
 
 class Playlist(object):
-    songs = []
-    order =[]
+    #songs = []
+    #order =[]
         
     def __init__(self, songs, order):
+        self.songs = []
+        self.order = []
         for s in songs:
             self.songs.append(s)
         for o in order:
@@ -107,21 +129,21 @@ class Playlist(object):
 
     def sendTable(self):
         tab = []
-        for s in self.songs:
-            tab.append([s.location,s.bpm,s.key])
+        for o in self.order:
+            tab.append([self.songs[o].location,self.songs[o].bpm,self.songs[o].key])
         return tab
 
     
     def sendArtistTitleTable(self):
         tab = []
-        for s in self.songs:
-            tab.append([s.location,s.artist,s.title])
+        for o in self.order:
+            tab.append([self.songs[o].location,self.songs[o].artist,self.songs[o].title])
         return tab
     
     def sendLocationTable(self):
         tab = []
-        for s in self.songs:
-            tab.append(s.location)
+        for o in self.order:
+            tab.append(self.songs[o].location)
         return tab
         
 
@@ -138,18 +160,18 @@ class NMLHandler(object):
                 collection = i
                 for entry in collection:
                     location = entry[0].get("VOLUME")+self.fixNMLlocation(entry[0].get("DIR")+entry[0].get("FILE"))
-                    bpm,key,artist,title = 0,0,entry.get("ARTIST"), entry.get("TITLE")
+                    bpm,key,artist,title, playtime = 0,0,entry.get("ARTIST"), entry.get("TITLE"), 0.0
                     sections = []
                     for child in entry:
                         if child.tag=='TEMPO':
-                            bpm = child.get("BPM")
+                            bpm = float(child.get("BPM"))
                         if child.tag=='MUSICAL_KEY':
-                            key = child.get("VALUE")
+                            key = int(child.get("VALUE"))
                         if child.tag=='INFO':
-                                playtime = child.get("PLAYTIME")
+                                playtime = float(child.get("PLAYTIME"))
                         if child.tag=='CUE_V2':
                             if child.get("TYPE")==5:
-                                sections.append(Section(child.get("START"),child.get("LEN")))
+                                sections.append(Section(child.get("START"),child.get("LEN"), "None"))
                     songs.append(Song(artist,title,bpm, key, location, sections,playtime))
             if i.tag =='PLAYLISTS':
                 if i[0][0].tag=='SUBNODES':
@@ -158,7 +180,7 @@ class NMLHandler(object):
                             currlist = i[0][0][j][0]
                             for entry in currlist:
                                 for i, s in enumerate(songs):
-                                    if str(s.location.split(fileHandler(''))[-1]) ==str(entry[0].get("KEY").split('/')[-1]):
+                                    if str(s.location.split(fileHandler(''))[-1]) ==str(entry[0].get("KEY").split(':')[-1]):
                                         order.append(i)
                                 
         nml.close

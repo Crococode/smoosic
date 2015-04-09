@@ -2,13 +2,12 @@ import sys
 import os
 from numpy import zeros, log10, array, mean ,var, linalg, ones, cov, argmax, argmin
 import linecache as lc
-from pb_nml import Song, fileHandler
+from pb_nml import Section, Song, fileHandler
 
 #import matplotlib.pyplot as plt
 #import scipy as sp
 
 DEFAULT_ANALYSIS_LENGTH = 1000
-#DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+"/database"
 if sys.platform.startswith("win32"):
         DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("\\database")
 else:
@@ -27,7 +26,7 @@ def fillFVsBySeg( audiofile , features , segst , seglen ):
 	fv =[]
 	nof = 0
 	for feat in features:
-                afefile = DEFAULT_DATABSE + fileHandler(audiofile) + "." + str(feat) + ".csv"
+                afefile = DEFAULT_DATABASE + fileHandler(audiofile) + "." + str(feat) + ".csv"
 		try:
 			fin = open(afefile)
 			if not str(feat)=="mfcc":
@@ -120,6 +119,27 @@ def comp2FV( fv1, fv2 ):
 			ffv.append(0)
 	return linalg.norm(array(ffv))
 
+def comp2FVkeyBPM( fv1, fv2, bpmVal, keyVal):
+	if not len(fv1)==len(fv2):
+		print "ERROR: Feature vectores of different sizes entered"
+		return
+	ffv = []
+	length = 0
+	for i in range(len(fv1)-2):
+		n = fv1[i]+fv2[i]
+		m = abs(fv1[i]-fv2[i])
+		if not n==0:
+			ffv.append(m/n)
+		else:
+			ffv.append(0)
+        out = linalg.norm(array(ffv))
+        out += keyComp(fv1[-1],fv2+[-1])*keyVal
+        out += abs(fv1[-2]-fv2[-2])*bpmVal 
+	return out
+
+def keyComp(k1,k2):
+        return 1
+
 # DEPRECATED!
 # testing function
 def comp2Songs( song1, song2 , featureplan):
@@ -137,8 +157,7 @@ def comp2Songs( song1, song2 , featureplan):
 		for j in range(len(maxi2)):
 			mat[i,j]=comp2FV(fvs1[i],fvs2[j])
 	print mat
-
-# DEPRECATED!	
+	
 # old Database implementation
 def read1SegFromDbFile( audiofiles ):
 	segs = dict.fromkeys(audiofiles)
@@ -151,10 +170,11 @@ def read1SegFromDbFile( audiofiles ):
 			segs[name[0]] = maxi[0]
 	return segs
 
-# DEPRECATED!	
 # old Database implementation
-def updateSeg( audiofiles , featureplan, num ):
-	newfiles = set(audiofiles)
+def updateSeg( songs , featureplan, num ):
+        newfiles = set()
+        for s in songs:
+                newfiles.add(s.location)
 	fin = open(DEFAULT_DATABASE+fileHandler("sections_db.txt"),'r+')
 	for line in fin:
 		name = line.split(":")
@@ -165,8 +185,8 @@ def updateSeg( audiofiles , featureplan, num ):
 				newfiles.remove(name[0])
 			except KeyError:
 				pass
-	for song in newfiles:
-		maxi = findSeg( song.location , featureplan, num )
+	for f in newfiles:
+		maxi = findSeg( f , featureplan, num )
 		s = ''
 		s = song + ":"
 		for i in maxi:
@@ -226,7 +246,7 @@ def findSeg( audiofile , featureplan , num):
 	#plt.plot(ddv)
 	#plt.axis([0,nos,0,50])
 	#plt.show()
-	
+	print ddv
 	# select ROIs by maxima
 	maxi = []
 	deletedRange = int(nos/(num*2))
@@ -251,77 +271,114 @@ def secondsToMinutes(s):
 	#print s,a,b
 	return a+b
 
-# Distance Matrix implementation
-# only calculates distances between first halfs and second halfs
-def distanceMatrixMtlSmart(songs, featureplan, bpmVal, keyVal): 
-    print "Starting smart distance matrix calculation of ",  songs
-    features = getFeatures( featureplan )
-    sections = []
+def loadMtlData(songs):
+    ssections = []
+    esections = []
     sentrys = []
     eentrys = []
-    sfvs = []
-    efvs = []
-    matlen = 0
-    sections.append(0)
+    slist = []
+    elist = []
     for s in songs:
-		fin = open(DEFAULT_DATABASE+fileHandler(s.location)+".timeline.mtl","r")
+        mtlfile = DEFAULT_DATABASE+fileHandler(s.location)+".timeline.mtl"
+        try:
+		fin = open(mtlfile,"r")
 		nosecs = int(fin.readline())
 		ssecs = int(nosecs*0.5)
-		sections.append(ssecs+sections[len(sections)-1])
-		matlen = matlen +ssecs
 		fin.readline()
-		nos = int(fin.readline())
-		for secs in range(ssecs):
-			sta = int(fin.readline())
-			fin.readline()
-			end = int(fin.readline())
-			label = fin.readline()
-			sfvs.append(timbFV( s.location, features , sta, end-sta ).append(s.bpm).append(s.key))
-			sentrys.append(s+":"+label+":"+str(sta))
-		for secs in range(ssecs,nosecs):
-			sta = int(fin.readline())
-			fin.readline()
-			end = int(fin.readline())
-			label = fin.readline()
-			efvs.append(timbFV( s.location, features , sta, end-sta ).append(s.bpm).append(s.key))
-			eentrys.append(s+":"+label+".:"+str(sta))
-    mat = zeros((matlen,matlen))
-    for i in range(matlen):
-		for j in range(matlen):
-			mat[i,j]=comp2FV(efvs[i],sfvs[j])
-    return mat, sections, sentrys, eentrys
+		fin.readline()
+                if(len(s.startsections)==0):
+                        for secs in range(ssecs):
+                                sta = int(fin.readline())
+                                fin.readline()
+                                end = int(fin.readline())
+                                label = fin.readline()
+                                sec = Section(sta,end-sta,label)
+                                sec.fromFrames()
+                                s.startsections.append(sec)
+                if(len(s.endsections)==0):
+                        for secs in range(ssecs,nosecs):
+                                sta = int(fin.readline())
+                                fin.readline()
+                                end = int(fin.readline())
+                                label = fin.readline()
+                                sec = Section(sta,end-sta,label)
+                                sec.fromFrames()
+                                s.endsections.append(sec)
+        except IOError:
+		print "Mtl file not found: ",mtlfile
+		return 0
+    return songs
 
-# DEPRECATED!
-# Simple distance Matrix Timeline implementation
-# Careful: Function does not distinguish between different songs, similarity among parts of the same songs possible!	
-def distanceMatrixMtl(songs, featureplan): 
-	features = getFeatures( featureplan )
-	entrys = []
-	fvs = []
-	for s in songs:
-		fin = open(DEFAULT_DATABASE+fileHandler(s.location)+".timeline.mtl","r")
-		nosecs = int(fin.readline())
-		fin.readline()
-		nos = int(fin.readline())
-		for secs in range(nosecs):
-			sta = int(fin.readline())
-			fin.readline()
-			end = int(fin.readline())
-			label = fin.readline()
-			fvs.append(timbFV( s.location, features , sta, end-sta ))
-			entrys.append(s+"."+label+"."+str(secs))
-	mat = zeros((len(entrys),len(entrys)))
-	for i in range(len(entrys)):
-		for j in range(len(entrys)):
-			if j>i:
-				mat[i,j]=comp2FV(fvs[i],fvs[j])
-				mat[j,i]=mat[i,j]
-			if j==i:
-				mat[i,j]=float("inf")
-	return mat,entrys
+# Distance Matrix implementation
+# only calculates distances between first halfs and second halfs
+def distanceMatrixMtlKB(songlist, featureplan, bpmVal, keyVal): 
+    print "Starting smart distance matrix calculation"
+    songs = loadMtlData(songlist)
+    if songs == 0:
+            print "ERROR: Aborting calculation. Timeline data load error!"
+            return
+    features = getFeatures( featureplan )
+    sfvs = []
+    efvs = []
+    esections =[]
+    ssections =[]
+    esections.append(0)
+    ssections.append(0)
+    for s in songs:
+        for efv in s.endsections:
+                st, le = efv.toFrames()
+                tfv = timbFV( s.location, features , st, le )
+                tfv.append(s.bpm)
+                tfv.append(s.key)
+                efvs.append(tfv)
+        esections.append(len(s.endsections)+esections[-1])
+        for sfv in s.startsections:
+                st , le = sfv.toFrames()
+                tfv = timbFV( s.location, features , st , le)
+                tfv.append(s.bpm)
+                tfv.append(s.key)
+                sfvs.append(tfv)
+        ssections.append(len(s.startsections)+ssections[-1])
+    matlen = ssections[-1]+esections[-1]
+    mat = zeros((ssections[-1],esections[-1]))
+    for i in range(ssections[-1]):
+		for j in range(esections[-1]):
+			mat[i,j]=comp2FVkeyBPM(sfvs[i],efvs[j],bpmVal,keyVal)
+    return songs, mat, ssections, esections
+
+def distanceMatrixMtl(songlist, featureplan): 
+    print "Starting smart distance matrix calculation"
+    songs = loadMtlData(songlist)
+    if songs == 0:
+            print "ERROR: Aborting calculation. Timeline data load error!"
+            return
+    features = getFeatures( featureplan )
+    sfvs = []
+    efvs = []
+    esections =[]
+    ssections =[]
+    esections.append(0)
+    ssections.append(0)
+    for s in songs:
+            for efv in s.endsections:
+                    st, le = efv.toFrames()
+                    efvs.append(timbFV( s.location, features , st , le))
+            esections.append(len(s.endsections)+esections[-1])
+            for sfv in s.startsections:
+                    st, le = sfv.toFrames()
+                    sfvs.append(timbFV( s.location, features , st, le))
+            ssections.append(len(s.startsections)+ssections[-1])
+    matlen= ssections[-1]+esections[-1]
+    mat = zeros((ssections[-1],esections[-1]))
+    for i in range(ssections[-1]):
+		for j in range(esections[-1]):
+			mat[i,j]=comp2FV(sfvs[i],efvs[j])
+    return songs, mat, ssections, esections
+
+
 
 # Simple single vector distance Matrix
-def distanceMatrix( songs , featureplan, bpmVal, keyVal):
+def distanceMatrix( songs , featureplan):
 	seglen = 50
 	features = getFeatures( featureplan )
 	segs = read1SegFromDbFile(songs)
@@ -340,7 +397,27 @@ def distanceMatrix( songs , featureplan, bpmVal, keyVal):
 				mat[i,j]=float("inf")
 	return mat
 
-def orderMatrix( mat, entrys, first ):
+def distanceMatrixKB( songs , featureplan, bpmVal, keyVal):
+	seglen = 50
+	features = getFeatures( featureplan )
+	segs = read1SegFromDbFile(songs)
+	print segs
+	fvs = []
+	for song in songs:
+		sta = int(segs[song])
+		fvs.append(timbFV( song.location, features , sta, seglen ).append(song.bpm).append(song.key))
+	mat = zeros((len(fvs),len(fvs)))
+	for i in range(len(fvs)):
+		for j in range(len(fvs)):
+			if j>i:
+				mat[i,j]=comp2FVkeyBPM(fvs[i],fvs[j],bpmVal, keyVal)
+				mat[j,i]=mat[i,j]
+			if j==i:
+				mat[i,j]=float("inf")
+	return mat
+
+
+def orderMatrix( songs, mat, first , outputfile):
 	final = [0 for i in range(len(mat[0]))]
 	final[0] = first
 	mat[:,first]=float("inf")
@@ -348,11 +425,62 @@ def orderMatrix( mat, entrys, first ):
 		final[i+1] = argmin(mat[final[i]])
 		mat[:,final[i+1]]=float("inf")
 	for i in final:
-		print i,":",entrys[i]
-	print final
+		print i,":",songs[i].location
 	return final
 
-def orderMatrixSmart( songs, mat, sections, sentrys, eentrys, first,  outputfile ):
+def orderMatrixSmart( songs, mat, ssections, esections, first):
+    final = [0 for i in range(len(songs))]
+    final[0] = first
+    ssection = [0 for i in range(len(songs))]
+    esection = [0 for i in range(len(songs))]
+    ssection[0] = 0
+    for i in range(ssections[first],ssections[first+1]):
+        mat[i,:] = float("inf")
+    for i in range(len(songs)-1):
+        testlist = []
+        for j in range(esections[final[i]],esections[final[i]+1]):
+            testlist.append(mat[:,i])
+        amin = argmin(testlist)
+        while amin > ssections[-1]:
+            amin = amin - ssections[-1]
+            esection[i] = esection[i]+1
+        for j,sec in enumerate(ssections):
+            if amin < sec:
+                final[i+1] = j-1
+                ssection[i+1] = amin-ssections[j-1]
+                break
+        for j in range(ssections[final[i+1]],ssections[final[i+1]+1]):
+            mat[j,:] = float("inf")
+    return final, ssection,esection
+
+def printOrder( songs, final, ssection, esection, outputfile ):
+    if outputfile !='':
+        output = open(outputfile, 'w+')
+    split = 2
+    if sys.platform.startswith("win32"):
+            split = 3
+    for j,i in enumerate(final):
+        sseconds = 0
+        if j != 0:
+            sseconds = songs[i].startsections[ssection[i]].start/1000
+        sminutes = int(secondsToMinutes(sseconds))
+        sseconds = sseconds - 60*sminutes
+        #print eentrys[sections[i]+esection[i]].split(":"), eentrys[sections[i]+esection[i]], eentrys, sections[i], esection[i]
+        eseconds = songs[i].endsections[esection[i]].start/1000
+        eminutes = int(secondsToMinutes(eseconds))
+        eseconds = eseconds - 60*eminutes				
+        print "Starting at " , sminutes, ":" , int(sseconds),"\n",i,":",songs[i].location,"\nEnding at ", eminutes, ":" , int(eseconds)
+        if output:
+            for stri in ["Starting at ", sminutes, ":" , str(int(sseconds)),"\n",i,":",songs[i].location,"\nEnding at ",str(eminutes), ":" , str(int(eseconds)),"\n"]:
+                output.write(str(stri))
+    try:
+            output.close()
+    except IOError:
+            pass
+    return
+
+##DEPRECATED!
+def orderMatrixSmartOld( songs, mat, sections, sentrys, eentrys, first,  outputfile ):
     final = [0 for i in range(len(songs))]
     final[0] = first
     ssection = [0 for i in range(len(songs))]

@@ -49,8 +49,8 @@ class playlistTableModel(QtCore.QAbstractTableModel):
 
 class Gui(QtGui.QMainWindow):
     
-    fname = ''
-    featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan.txt')
+    #fname = ''
+    #featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan.txt')
     start = str(0)
     timelineMode = True
     bpmVal = 50
@@ -81,20 +81,20 @@ class Gui(QtGui.QMainWindow):
         grid = QtGui.QGridLayout()
         wid.setLayout(grid)
         
-        timelineEdit = QtGui.QRadioButton(self)
-        timelineEdit.setChecked(self.timelineMode)
-        timelineEdit.setStatusTip('Switch between timeline and single vector mode')
+        self.timelineEdit = QtGui.QRadioButton(self)
+        self.timelineEdit.setChecked(self.timelineMode)
+        self.timelineEdit.setStatusTip('Switch between timeline and single vector mode')
         grid.addWidget(QtGui.QLabel('Timeline mode: '), 0, 0, QtCore.Qt.AlignLeft)
-        grid.addWidget(timelineEdit, 0, 1, QtCore.Qt.AlignLeft)
-        startEdit = QtGui.QLineEdit(self.start)
-        startEdit.setStatusTip('Choose first track for optimized playlist')
+        grid.addWidget(self.timelineEdit, 0, 1, QtCore.Qt.AlignLeft)
+        self.startEdit = QtGui.QLineEdit(self.start)
+        self.startEdit.setStatusTip('Choose first track for optimized playlist')
         grid.addWidget(QtGui.QLabel('First Track: '), 1, 0, QtCore.Qt.AlignLeft)
-        grid.addWidget(startEdit, 1, 1, QtCore.Qt.AlignLeft)
+        grid.addWidget(self.startEdit, 1, 1, QtCore.Qt.AlignLeft)
         grid.addWidget(self.bpmLabel, 0, 2, QtCore.Qt.AlignLeft)
         grid.addWidget(self.bpmEdit,0, 3, QtCore.Qt.AlignLeft)        
         grid.addWidget(self.keyLabel, 1, 2, QtCore.Qt.AlignLeft)
         grid.addWidget(self.keyEdit, 1, 3, QtCore.Qt.AlignLeft)        
-        grid.addWidget(self.pbTab, 3, 0, 1 , 4)
+        grid.addWidget(self.pbTab, 3, 0, 1 , 8)
         
         self.statusBar().showMessage('Ready')
         exitAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&Exit', self)        
@@ -121,29 +121,51 @@ class Gui(QtGui.QMainWindow):
         fileMenu.addAction(openFeatAction)
         toolMenu.addAction(distanceMatrixSmartAction)
         
-        self.setGeometry(200, 200, 400, 300)
-        self.setWindowTitle('Smoosic 1.0')    
+        self.setGeometry(200, 200, 800, 400)
+        self.setWindowTitle('Smoosic 1.0')
+        self.featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan.txt')
         self.show()
         
     def exeDistanceMatrixMtlSmart(self):
-        output = QtGui.QFileDialog.getSaveFileName(self, 'Output file', 
-                os.path.dirname(os.path.realpath(sys.argv[0])))
+        #output = QtGui.QFileDialog.getSaveFileName(self, 'Output file', 
+        #       os.path.dirname(os.path.realpath(sys.argv[0])))
+        output = "C:\Users\Hugo\Desktop\Code\AFE\outNu.txt"
+        print ""
+        print ""
         self.statusBar().showMessage('Importing music to AFE Database')
         afe.afeImport(self.list.songs, self.featureplan)
         self.statusBar().showMessage('Updating timelines')
         pb.updateMtlDatabase(self.list.songs, self.featureplan,4)
         if self.bpmLabel.isEnabled() == True:
             self.statusBar().showMessage('Starting distance matrix calculation')
-            mat,sections, sentrys, eentrys = pb.distanceMatrixMtlSmart(self.list.songs, self.featureplan)
-            self.statusBar().showMessage('Sorting distance matrix')
-            pb.orderMatrixSmart(self.list.songs,mat,sections, sentrys, eentrys, int(self.start), output)
-            self.statusBar().showMessage('Ready')
+            if self.timelineEdit.isChecked() == True:
+                self.list.songs,mat, ssections, esections = pb.distanceMatrixMtlKB(self.list.songs, self.featureplan, self.bpmEdit.value()/100.0, self.keyEdit.value()/100.0)
+                self.statusBar().showMessage('Sorting distance matrix')
+                final, ssections, esections = pb.orderMatrixSmart(self.list.songs,mat,ssections, esections, self.list.order[int(self.startEdit.text())])
+                pb.printOrder(self.list.songs, final, ssections, esections , output)
+            else:
+                pb.updateSeg(self.list.sendLocationTable(), self.featureplan, 1)
+                mat = pb.distanceMatrixKB(self.list.songs, self.featureplan, self.bpmEdit.value()/100.0, self.keyEdit.value()/100.0)
+                self.statusBar().showMessage('Sorting distance matrix')
+                final = pb.orderMatrix(self.list.songs,mat, self.list.order[int(self.startEdit.text())], output)
+            self.list.updateOrder(final)
+            self.pbTab.addList(self.list.sendTable(), ['File','BPM', 'Key'])
+            
         else:
             self.statusBar().showMessage('Starting distance matrix calculation')
-            mat,sections, sentrys, eentrys = pb.distanceMatrixMtlSmart(self.list.songs, self.featureplan)
-            self.statusBar().showMessage('Sorting distance matrix')
-            pb.orderMatrixSmart(self.list.songs,mat,sections, sentrys, eentrys, int(self.start), output)
-            self.statusBar().showMessage('Ready')
+            if self.timelineEdit.isChecked() == True:
+                self.list.songs,mat, ssections, esections = pb.distanceMatrixMtl(self.list.songs, self.featureplan)
+                self.statusBar().showMessage('Sorting distance matrix')
+                final, ssections, esections = pb.orderMatrixMtl(self.list.songs,mat,ssections, esections, self.list.order[int(self.startEdit.text())])
+                pb.printOrder(self.list.songs, final, ssections, esections , output)
+            else:
+                pb.updateSeg(self.list.songs, self.featureplan, 1)
+                mat = pb.distanceMatrix(self.list.songs, self.featureplan)
+                self.statusBar().showMessage('Sorting distance matrix')
+                final = pb.orderMatrix(self.list.songs,mat, self.list.order[int(self.startEdit.text())], output)
+            self.list.updateOrder(final)
+            self.pbTab.addList(self.list.sendArtistTitleTable(), ['File','Artist', 'Title'])
+        self.statusBar().showMessage('Ready')
 
     
     def closeDialog(self, event):
@@ -155,8 +177,9 @@ class Gui(QtGui.QMainWindow):
     
     def showOpenDialog(self):
         
-        self.fname = QtGui.QFileDialog.getOpenFileName(self, 'Load playlist file', 
-                os.path.dirname(os.path.realpath(sys.argv[0])))
+        #self.fname = QtGui.QFileDialog.getOpenFileName(self, 'Load playlist file', 
+        #        os.path.dirname(os.path.realpath(sys.argv[0])))
+        self.fname = "C:\Users\Hugo\Desktop\Test.nml"
         self.statusBar().showMessage('Opening: '+self.fname)
         if QtCore.QFileInfo(self.fname).suffix() == "nml":
             print "Loading NML File: ",  self.fname
@@ -176,9 +199,9 @@ class Gui(QtGui.QMainWindow):
         print "Loading TXT File: ",  self.fname
         songs = []
         for line in fin:
-            songs.append(nml.Song(' ',' ',0,0,line.strip(),[]))
+            songs.append(nml.Song(' ',' ',0,0,line.strip(),[], 0.0))
         fin.close()
-        self.list.add(songs,[])
+        self.list.add(songs,range(len(songs)))
         self.pbTab.addList(self.list.sendArtistTitleTable(), ['File','Artist', 'Title'])
         self.bpmLabel.setEnabled(False)
         self.keyLabel.setEnabled(False)
