@@ -1,6 +1,8 @@
 from lxml import etree as et
 from sys import platform
+import uuid
 
+DEFAULT_ANALYSIS_LENGTH = 1000
 DEFAULT_LEN = 4000
 TO_FRAMES = 44.1/512
 FROM_FRAMES = 512/44.1
@@ -30,7 +32,7 @@ class Section(object):
 
     def __init__(self, start, length, label):
         self.start = start
-        if length >= 0:
+        if length >= 0.0:
             self.length = length
             self.end = start + length
         else:
@@ -39,7 +41,11 @@ class Section(object):
         self.label = label
         
     def toFrames(self):
-            return int(self.start * TO_FRAMES), int(self.length * TO_FRAMES)
+            st = int(self.start * TO_FRAMES)
+            le = int(self.length * TO_FRAMES)
+            if le <=0:
+                    le = DEFAULT_ANALYSIS_LENGTH
+            return st , le  
 
     def fromFrames(self):
         self.start *= FROM_FRAMES
@@ -48,24 +54,6 @@ class Section(object):
 
         
 class Song(object):
-    #bpm = 0
-    #location = ''
-    #artist = ''
-    #title = ''
-    #key = 0
-    #sections = []
-    #startsections = []
-    #endsections =[]
-    #playtime = 0.0
-    
-    #def __init__(self, artist, title, bpm, key, location, sections):
-    #    self.bpm = bpm
-    #    self.artist = artist
-    #    self.title = title
-    #    self.location = location
-    #    self.key = key
-    #    for sec in sections:
-    #        self.sections.append(sec)
 
     def __init__(self, artist, title, bpm, key, location, sections, playtime):
         self.bpm = bpm
@@ -78,6 +66,8 @@ class Song(object):
         if playtime != 0.0:
                 self.playtime = playtime
                 middle = 0.5*playtime
+                # convert to ms
+                middle *= 1000.0
                 for sec in sections:
                         if sec.start < middle:
                                 self.startsections.append(sec)
@@ -87,26 +77,13 @@ class Song(object):
                 for sec in sections:
                         self.sections.append(sec)
                         
-    def addSectionList(self, startsecs,endsecs):
-        for ssec in startsecs:
-                self.startsections.append(ssec)
-        for ssec in endsecs:
-                self.endsections.append(ssec)
+    def setRecommendedSection(self,recstart,recend):
+            self.recStart = recstart
+            self.recEnd = recend
         
-
-    
-    #def Song(artist, track,  bpm, key, location, sections):
-    #    self.bpm = bpm
-    #    self.artist = artist
-    #    self.track = track
-    #    self.key = key
-    #    self.location = location
-    #    self.sections = sections
 
 
 class Playlist(object):
-    #songs = []
-    #order =[]
         
     def __init__(self, songs, order):
         self.songs = []
@@ -170,8 +147,8 @@ class NMLHandler(object):
                         if child.tag=='INFO':
                                 playtime = float(child.get("PLAYTIME"))
                         if child.tag=='CUE_V2':
-                            if child.get("TYPE")==5:
-                                sections.append(Section(child.get("START"),child.get("LEN"), "None"))
+                            if int(child.get("TYPE"))!=4:
+                                sections.append(Section(float(child.get("START")),float(child.get("LEN")), "None"))
                     songs.append(Song(artist,title,bpm, key, location, sections,playtime))
             if i.tag =='PLAYLISTS':
                 if i[0][0].tag=='SUBNODES':
@@ -186,6 +163,66 @@ class NMLHandler(object):
         nml.close
         print order
         return songs, order
+
+    def saveFile(self, plist, oldfile, newfile):
+        songs = []
+        order = []
+        defaultCueDict = {'NAME':'n.n.','DISPL_ORDER':'0','START':'0','LEN':'0','TYPE':'0','REPEATS':'-1','HOTCUE':'0'}
+        defaultPlaylistDict = {'ENTRIES':'0','TYPE':'LIST','UUID':'0'}
+        defaultPlaylistSongDict = {'TYPE':'TRACK','KEY':''}
+        nml = open(oldfile, 'r')
+        tree = et.parse(nml)
+        root = et.fromstring(et.tostring(tree))
+        for i in root:
+            if i.tag=='COLLECTION':
+                collection = i
+                for j,entry in enumerate(collection):
+                    #for child in entry:
+                    #    if child.tag=='CUE_V2':
+                    #        if child.get("TYPE")!=5:
+                    #            entry.remove(child)
+                    startnode = et.Element('CUE_V2',defaultCueDict)
+                    startnode.set("HOTCUE","3")
+                    startnode.set("NAME","Start")
+                    startnode.set("START",str(plist.songs[j].startsections[plist.songs[j].recStart].start))
+                    entry.append(startnode)
+                    endnode = et.Element('CUE_V2',defaultCueDict)
+                    endnode.set("HOTCUE","4")
+                    endnode.set("NAME","End")
+                    endnode.set("START",str(plist.songs[j].endsections[plist.songs[j].recEnd].start))
+                    entry.append(endnode)
+            if i.tag =='PLAYLISTS':
+                if i[0][0].tag=='SUBNODES':
+                    for j in range(int(i[0][0].get("COUNT"))):
+                        i[0][0].remove(i[0][0][j])    
+                    #    if i[0][0][j].get("TYPE")=="PLAYLIST":
+                    numOfPlaylists = int(i[0][0].get("COUNT"))
+                    #numOfPlaylists += 1
+                    #i[0][0].set("COUNT", str(numOfPlaylists))
+                    newplist = et.Element('PLAYLIST',defaultPlaylistDict)
+                    newplist.set('ENTRIES',str(len(plist.songs)))
+                    newplist.set('UUID',uuid.uuid4().hex)
+                    newlist = et.Element('NODE',{'TYPE':'PLAYLIST','NAME':'Smoosic list'})
+                    newlist.append(newplist)
+                    i[0][0].append(newlist)
+                    for o in plist.order:
+                            key = ""
+                            for sub in plist.songs[o].location.split("\\"):
+                                    key += sub + "/:"
+                            key = key[:-2]
+                            entry = et.Element('ENTRY')
+                            song = et.Element('PRIMARYKEY',defaultPlaylistSongDict)
+                            song.set('KEY',str(key))
+                            entry.append(song)
+                            i[0][0][0][numOfPlaylists-1].append(entry)
+                                
+        nml.close
+        try:
+                et.ElementTree(root).write(str(newfile))
+        except IOError:
+                print "Error: cannot save current XML document!"
+                return 0
+        return 1
 
     def fixNMLlocation(self, wrongstring):
         newstring = ''

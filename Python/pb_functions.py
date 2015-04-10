@@ -2,12 +2,10 @@ import sys
 import os
 from numpy import zeros, log10, array, mean ,var, linalg, ones, cov, argmax, argmin
 import linecache as lc
-from pb_nml import Section, Song, fileHandler
+from pb_nml import Section, Song, fileHandler,DEFAULT_ANALYSIS_LENGTH
 
-#import matplotlib.pyplot as plt
-#import scipy as sp
 
-DEFAULT_ANALYSIS_LENGTH = 1000
+
 if sys.platform.startswith("win32"):
         DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("\\database")
 else:
@@ -286,12 +284,15 @@ def loadMtlData(songs):
 		ssecs = int(nosecs*0.5)
 		fin.readline()
 		fin.readline()
-                if(len(s.startsections)==0):
-                        for secs in range(ssecs):
-                                sta = int(fin.readline())
-                                fin.readline()
-                                end = int(fin.readline())
-                                label = fin.readline()
+		readnewStart = False
+		if(len(s.startsections)==0):
+                        readnewStart = True
+                for secs in range(ssecs):
+                        sta = int(fin.readline())
+                        fin.readline()
+                        end = int(fin.readline())
+                        label = fin.readline()
+                        if readnewStart == True:
                                 sec = Section(sta,end-sta,label)
                                 sec.fromFrames()
                                 s.startsections.append(sec)
@@ -443,7 +444,7 @@ def orderMatrixSmart( songs, mat, ssections, esections, first):
         amin = argmin(testlist)
         while amin > ssections[-1]:
             amin = amin - ssections[-1]
-            esection[i] = esection[i]+1
+            esection[i] += 1
         for j,sec in enumerate(ssections):
             if amin < sec:
                 final[i+1] = j-1
@@ -451,9 +452,17 @@ def orderMatrixSmart( songs, mat, ssections, esections, first):
                 break
         for j in range(ssections[final[i+1]],ssections[final[i+1]+1]):
             mat[j,:] = float("inf")
-    return final, ssection,esection
+    for i, val in enumerate(final):
+            songs[val].setRecommendedSection(ssection[i],esection[i])
+            print songs[val].location, ssection[i], songs[val].recStart, songs[val].startsections
+            try:
+                    print songs[val].startsections[songs[val].recStart].start
+            except IndexError:
+                    print songs[val].startsections[0].start
+                    print i, ssections
+    return songs,final
 
-def printOrder( songs, final, ssection, esection, outputfile ):
+def printOrder( songs, final, outputfile ):
     if outputfile !='':
         output = open(outputfile, 'w+')
     split = 2
@@ -462,11 +471,11 @@ def printOrder( songs, final, ssection, esection, outputfile ):
     for j,i in enumerate(final):
         sseconds = 0
         if j != 0:
-            sseconds = songs[i].startsections[ssection[i]].start/1000
+            sseconds = songs[i].startsections[songs[i].recStart].start/1000
         sminutes = int(secondsToMinutes(sseconds))
         sseconds = sseconds - 60*sminutes
         #print eentrys[sections[i]+esection[i]].split(":"), eentrys[sections[i]+esection[i]], eentrys, sections[i], esection[i]
-        eseconds = songs[i].endsections[esection[i]].start/1000
+        eseconds = songs[i].endsections[songs[i].recEnd].start/1000
         eminutes = int(secondsToMinutes(eseconds))
         eseconds = eseconds - 60*eminutes				
         print "Starting at " , sminutes, ":" , int(sseconds),"\n",i,":",songs[i].location,"\nEnding at ", eminutes, ":" , int(eseconds)

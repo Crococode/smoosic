@@ -49,8 +49,6 @@ class playlistTableModel(QtCore.QAbstractTableModel):
 
 class Gui(QtGui.QMainWindow):
     
-    #fname = ''
-    #featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan.txt')
     start = str(0)
     timelineMode = True
     bpmVal = 50
@@ -113,6 +111,12 @@ class Gui(QtGui.QMainWindow):
         distanceMatrixSmartAction.setShortcut('Ctrl+O')
         distanceMatrixSmartAction.setStatusTip('Optimise current list')
         distanceMatrixSmartAction.triggered.connect(self.exeDistanceMatrixMtlSmart)
+        self.safeNMLAction = QtGui.QAction(QtGui.QIcon(), '&Safe NML',  self)
+        self.safeNMLAction.setShortcut('Ctrl+S')
+        self.safeNMLAction.setStatusTip('Safe current list in NML format')
+        self.safeNMLAction.triggered.connect(self.saveList)
+        self.safeNMLAction.setEnabled(False)
+
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
         toolMenu = menubar.addMenu('&Tools')
@@ -120,6 +124,7 @@ class Gui(QtGui.QMainWindow):
         fileMenu.addAction(openAction)
         fileMenu.addAction(openFeatAction)
         toolMenu.addAction(distanceMatrixSmartAction)
+        toolMenu.addAction(self.safeNMLAction)
         
         self.setGeometry(200, 200, 800, 400)
         self.setWindowTitle('Smoosic 1.0')
@@ -141,8 +146,8 @@ class Gui(QtGui.QMainWindow):
             if self.timelineEdit.isChecked() == True:
                 self.list.songs,mat, ssections, esections = pb.distanceMatrixMtlKB(self.list.songs, self.featureplan, self.bpmEdit.value()/100.0, self.keyEdit.value()/100.0)
                 self.statusBar().showMessage('Sorting distance matrix')
-                final, ssections, esections = pb.orderMatrixSmart(self.list.songs,mat,ssections, esections, self.list.order[int(self.startEdit.text())])
-                pb.printOrder(self.list.songs, final, ssections, esections , output)
+                self.list.songs,final= pb.orderMatrixSmart(self.list.songs,mat,ssections, esections, self.list.order[int(self.startEdit.text())])
+                pb.printOrder(self.list.songs, final, output)
             else:
                 pb.updateSeg(self.list.sendLocationTable(), self.featureplan, 1)
                 mat = pb.distanceMatrixKB(self.list.songs, self.featureplan, self.bpmEdit.value()/100.0, self.keyEdit.value()/100.0)
@@ -156,8 +161,8 @@ class Gui(QtGui.QMainWindow):
             if self.timelineEdit.isChecked() == True:
                 self.list.songs,mat, ssections, esections = pb.distanceMatrixMtl(self.list.songs, self.featureplan)
                 self.statusBar().showMessage('Sorting distance matrix')
-                final, ssections, esections = pb.orderMatrixMtl(self.list.songs,mat,ssections, esections, self.list.order[int(self.startEdit.text())])
-                pb.printOrder(self.list.songs, final, ssections, esections , output)
+                self.list.songs,final = pb.orderMatrixSmart(self.list.songs,mat,ssections, esections, self.list.order[int(self.startEdit.text())])
+                pb.printOrder(self.list.songs, final , output)
             else:
                 pb.updateSeg(self.list.songs, self.featureplan, 1)
                 mat = pb.distanceMatrix(self.list.songs, self.featureplan)
@@ -194,6 +199,7 @@ class Gui(QtGui.QMainWindow):
             self.keyLabel.setEnabled(True)
             self.bpmEdit.setEnabled(True)
             self.keyEdit.setEnabled(True)
+            self.safeNMLAction.setEnabled(True)
             return
         fin = open(self.fname)
         print "Loading TXT File: ",  self.fname
@@ -208,8 +214,14 @@ class Gui(QtGui.QMainWindow):
         self.bpmEdit.setEnabled(False)
         self.keyEdit.setEnabled(False)
         self.statusBar().showMessage('Ready')
-        
-        
+
+    def saveList(self):
+        self.statusBar().showMessage('Saving NML file')
+        saveName = QtGui.QFileDialog.getSaveFileName(self, 'Safe NML file', 
+                os.path.dirname(os.path.realpath(sys.argv[0])))
+        if nml.NMLHandler().saveFile(self.list,self.fname,saveName) == 0:
+            return
+        self.statusBar().showMessage('Ready')
         
     
     def showOpenFeatDialog(self):
