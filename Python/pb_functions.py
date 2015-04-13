@@ -6,6 +6,8 @@ from pb_nml import Section, Song, fileHandler,DEFAULT_ANALYSIS_LENGTH
 
 
 QUINT = 2
+BPM_FACTOR = 0.3
+KEY_FACTOR = 0.1
 
 if sys.platform.startswith("win32"):
         DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("\\database")
@@ -145,8 +147,8 @@ def comp2FVkeyBPM( fv1, fv2, bpmVal, keyVal):
 			ffv.append(m/n)
 		else:
 			ffv.append(0)
-        key = abs(keyComp(fv1[-1],fv2[-1]))*keyVal*0.1
-        bpm = abs(fv1[-2]-fv2[-2])*bpmVal*0.1
+        key = abs(quintCorr(keyComp(fv1[-1],fv2[-1])))*keyVal*KEY_FACTOR
+        bpm = abs(fv1[-2]-fv2[-2])*bpmVal*BPM_FACTOR
         out = linalg.norm(array(ffv))
         #print out, bpm, key
         out += key
@@ -162,12 +164,19 @@ def keyComp(k1,k2):
                         dif -= 3
                 else:
                         dif += 3
-        
+        return dif
+
+def quintCorr(dif):
         if dif == -7  or dif == 5:
                 return QUINT
         else:
                 return dif
 
+def quintCorrPrint(dif):
+        if dif == -7  or dif == 5:
+                return 0
+        else:
+                return dif          
 # DEPRECATED!
 # testing function
 def comp2Songs( song1, song2 , featureplan):
@@ -504,16 +513,15 @@ def printOrder( songs, final, outputfile ):
         bpmChange = 0 
         if j != 0:
             sseconds = songs[i].startsections[songs[i].recStart].start/1000
-            keyChange = -keyComp(songs[i].key,songs[i-1].key)
-            bpmChange = songs[i].bpm - songs[i-1].bpm
-            bpmChange *= -1.0
+            keyChange = quintCorrPrint(keyComp(songs[i].key,songs[final[j-1]].key))
+            bpmChange = float(songs[i].bpm - songs[final[j-1]].bpm)
         sminutes = int(secondsToMinutes(sseconds))
         sseconds = sseconds - 60*sminutes
         #print eentrys[sections[i]+esection[i]].split(":"), eentrys[sections[i]+esection[i]], eentrys, sections[i], esection[i]
         eseconds = songs[i].endsections[songs[i].recEnd].start/1000
         eminutes = int(secondsToMinutes(eseconds))
         eseconds = eseconds - 60*eminutes
-        print "Starting at " , sminutes, ":" , int(sseconds), "Rel. BPM change: ", bpmChange,"Rel. key change: ", keyChange,"\n",i,":",songs[i].location,"\nEnding at ", eminutes, ":" , int(eseconds)
+        print "Starting at " , sminutes, ":" , int(sseconds), "Rel. BPM change: ", bpmChange, "Rel. key change: ", keyChange,"\n",i,":",songs[i].location,"\nEnding at ", eminutes, ":" , int(eseconds)
         if output:
             for stri in ["Starting at ", sminutes, ":" , str(int(sseconds)),"\n",i,":",songs[i].location,"\nEnding at ",str(eminutes), ":" , str(int(eseconds)),"\n"]:
                 output.write(str(stri))

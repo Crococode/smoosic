@@ -140,15 +140,19 @@ class NMLHandler(object):
                     bpm,key,artist,title, playtime = 0,0,entry.get("ARTIST"), entry.get("TITLE"), 0.0
                     sections = []
                     for child in entry:
-                        if child.tag=='TEMPO':
-                            bpm = float(child.get("BPM"))
-                        if child.tag=='MUSICAL_KEY':
-                            key = int(child.get("VALUE"))
-                        if child.tag=='INFO':
-                                playtime = float(child.get("PLAYTIME_FLOAT"))
-                        if child.tag=='CUE_V2':
-                            if int(child.get("TYPE"))!=4:
-                                sections.append(Section(float(child.get("START")),float(child.get("LEN")), "None"))
+                        try:
+                                if child.tag=='TEMPO':
+                                    bpm = float(child.get("BPM"))
+                                if child.tag=='MUSICAL_KEY':
+                                    key = int(child.get("VALUE"))
+                                if child.tag=='INFO':
+                                        playtime = float(child.get("PLAYTIME_FLOAT"))
+                                if child.tag=='CUE_V2':
+                                    if int(child.get("TYPE"))!=4:
+                                        sections.append(Section(float(child.get("START")),float(child.get("LEN")), "None"))
+                        except TypeError:
+                                print "Error: Playlist does not contain sufficient information on track: ", location
+                                pass
                     songs.append(Song(artist,title,bpm, key, location, sections,playtime))
             if i.tag =='PLAYLISTS':
                 if i[0][0].tag=='SUBNODES':
