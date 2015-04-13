@@ -1,5 +1,0 @@
-Loudness: Energy blockSize=4096  stepSize=512
-SpectralShapeStatistics: SpectralShapeStatistics FFTLength=0  FFTWindow=Hanning  blockSize=4096  stepSize=512
-SpectralRolloff: SpectralRolloff FFTLength=0  FFTWindow=Hanning  blockSize=4096  stepSize=512
-SpectralFlux: SpectralFlux FFTLength=0  FFTWindow=Hanning  FluxSupport=All  blockSize=4096  stepSize=512
-ZCR: ZCR blockSize=4096  stepSize=512
