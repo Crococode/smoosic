@@ -5,6 +5,7 @@ import linecache as lc
 from pb_nml import Section, Song, fileHandler,DEFAULT_ANALYSIS_LENGTH
 
 
+QUINT = 2
 
 if sys.platform.startswith("win32"):
         DEFAULT_DATABASE = os.path.dirname(os.path.realpath(sys.argv[0]))+fileHandler("\\database")
@@ -92,13 +93,27 @@ def timbFV( audiofile, features , segst, seglen ):
 	for j in range(seglen):
 		if mat[0,j]<tfv[0]:
 			lef = lef+1
-	# norm timbFV:
+	# norm timbFV (featureplan_default settings):
+
+	# low energy feature
 	tfv[0]=float(lef)/seglen
+
+	# Spectral Centroid
 	tfv[2]=1+log10(tfv[2])/log10(16000)
 	tfv[3]=1+log10(tfv[3])/log10(16000)
-	tfv[4]=log10(tfv[4])/log10(16000)
-	tfv[5]=log10(tfv[5])/log10(16000)
+
+	# Spectral Rolloff
+	tfv[4]=1+log10(tfv[4])/log10(16000)
+	tfv[5]=1+log10(tfv[5])/log10(16000)
+
+	# Spectral Flux
 	tfv[6]=tfv[6]/seglen
+
+
+	# ZCR = related to white noise amount
+        tfv[7]
+
+        
 	#print tfv
 	return tfv
 	
@@ -130,13 +145,28 @@ def comp2FVkeyBPM( fv1, fv2, bpmVal, keyVal):
 			ffv.append(m/n)
 		else:
 			ffv.append(0)
+        key = abs(keyComp(fv1[-1],fv2[-1]))*keyVal*0.1
+        bpm = abs(fv1[-2]-fv2[-2])*bpmVal*0.1
         out = linalg.norm(array(ffv))
-        out += keyComp(fv1[-1],fv2+[-1])*keyVal
-        out += abs(fv1[-2]-fv2[-2])*bpmVal 
+        #print out, bpm, key
+        out += key
+        out += bpm
 	return out
 
 def keyComp(k1,k2):
-        return 1
+        if (k1 < 12 and k2 < 12 ) or (k1 > 12 and k2 > 12 ):
+                dif = k1-k2
+        else:
+                dif = abs(k1 - k2) - 12
+                if k1 < k2:
+                        dif -= 3
+                else:
+                        dif += 3
+        
+        if dif == -7  or dif == 5:
+                return QUINT
+        else:
+                return dif
 
 # DEPRECATED!
 # testing function
@@ -470,15 +500,20 @@ def printOrder( songs, final, outputfile ):
             split = 3
     for j,i in enumerate(final):
         sseconds = 0
+        keyChange = 0
+        bpmChange = 0 
         if j != 0:
             sseconds = songs[i].startsections[songs[i].recStart].start/1000
+            keyChange = -keyComp(songs[i].key,songs[i-1].key)
+            bpmChange = songs[i].bpm - songs[i-1].bpm
+            bpmChange *= -1.0
         sminutes = int(secondsToMinutes(sseconds))
         sseconds = sseconds - 60*sminutes
         #print eentrys[sections[i]+esection[i]].split(":"), eentrys[sections[i]+esection[i]], eentrys, sections[i], esection[i]
         eseconds = songs[i].endsections[songs[i].recEnd].start/1000
         eminutes = int(secondsToMinutes(eseconds))
-        eseconds = eseconds - 60*eminutes				
-        print "Starting at " , sminutes, ":" , int(sseconds),"\n",i,":",songs[i].location,"\nEnding at ", eminutes, ":" , int(eseconds)
+        eseconds = eseconds - 60*eminutes
+        print "Starting at " , sminutes, ":" , int(sseconds), "Rel. BPM change: ", bpmChange,"Rel. key change: ", keyChange,"\n",i,":",songs[i].location,"\nEnding at ", eminutes, ":" , int(eseconds)
         if output:
             for stri in ["Starting at ", sminutes, ":" , str(int(sseconds)),"\n",i,":",songs[i].location,"\nEnding at ",str(eminutes), ":" , str(int(eseconds)),"\n"]:
                 output.write(str(stri))

@@ -128,7 +128,7 @@ class Gui(QtGui.QMainWindow):
         
         self.setGeometry(200, 200, 800, 400)
         self.setWindowTitle('Smoosic 1.0')
-        self.featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan.txt')
+        self.featureplan = os.path.dirname(os.path.realpath(sys.argv[0]))+pb.fileHandler('featureplan_default.txt')
         self.show()
         
     def exeDistanceMatrixMtlSmart(self):
@@ -184,7 +184,7 @@ class Gui(QtGui.QMainWindow):
         
         #self.fname = QtGui.QFileDialog.getOpenFileName(self, 'Load playlist file', 
         #        os.path.dirname(os.path.realpath(sys.argv[0])))
-        self.fname = "C:\Users\Hugo\Desktop\Test.nml"
+        self.fname = "C:\Users\Hugo\Desktop\TEST2.nml"
         self.statusBar().showMessage('Opening: '+self.fname)
         if QtCore.QFileInfo(self.fname).suffix() == "nml":
             print "Loading NML File: ",  self.fname

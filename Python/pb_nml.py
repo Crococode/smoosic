@@ -145,7 +145,7 @@ class NMLHandler(object):
                         if child.tag=='MUSICAL_KEY':
                             key = int(child.get("VALUE"))
                         if child.tag=='INFO':
-                                playtime = float(child.get("PLAYTIME"))
+                                playtime = float(child.get("PLAYTIME_FLOAT"))
                         if child.tag=='CUE_V2':
                             if int(child.get("TYPE"))!=4:
                                 sections.append(Section(float(child.get("START")),float(child.get("LEN")), "None"))
