@@ -1,12 +1,18 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# Mainwindow app
+#
+#
+#
+
 import sys
 import os
 import pb_functions as pb
 import pb_nml as nml
 import pb_afe as afe
 from PyQt4 import QtGui, QtCore
+
 
 class playlistTable(QtGui.QWidget):
     lay = QtGui.QVBoxLayout()
